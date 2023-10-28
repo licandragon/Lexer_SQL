@@ -53,7 +53,16 @@ function descomponerQuery(query) {
       }
       componentes.push(caracter);
       componente = "";
-    } else {
+    } else if(esNumero(caracter) && esNumero(componente)){
+      //si encontramos un numero y el componente tambien es un numero tambien lo agregamos
+      componente += caracter;
+      if(query[i+1] === "." ){
+        //Si el siguiente caracter es un "." se añade como parte del componente (numero punto flotante)
+        componente += query[i+1];
+        i++;
+      }
+    }
+    else {
       // Agregamos el carácter al componente actual
       componente += caracter;
     }
@@ -65,6 +74,7 @@ function descomponerQuery(query) {
   return componentes;
 }
 
+//funcion que determina si es un numero
 function esNumero(num) {
   return /^[+-]?\d+(\.\d+)?$/.test(num);
 }
