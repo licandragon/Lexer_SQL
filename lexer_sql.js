@@ -1,28 +1,7 @@
 const fs = require("fs");
-const tokens = [];
-
-/*const reservadas_condicionales = [
-  "WHERE",
-  "ORDER BY",
-  "LIMIT",
-  "LIKE",
-  "BETWEEN",
-];
-const reservadas_order = ["ASC", "DESC"];
-const condicionales = ["<", ">", ">=", "<=", "=", "NOT", "OR", "AND"];
-const operador = ["*"];
-const reservadas_iniciales = [
-  "SELECT",
-  "INSERT",
-  "CREATE",
-  "UPDATE",
-  "DELETE",
-  "ALTER",
-  "USE",
-];
-const reservadas_secuenciales = ["FROM", "SET"];*/
+const tokens = {};
+const querys_descompuestos = [];
 const comillas = ["'", '"', "`"];
-
 const caracteres_especiales = [
   "*",
   "+",
@@ -53,7 +32,6 @@ function descomponerQuery(query) {
 
   for (let i = 0; i < query.length; i++) {
     const caracter = query[i];
-
     if (comillas.includes(caracter)) {
       // Cambiamos el estado de en_comillas cuando encontramos comillas
       en_comillas = !en_comillas;
@@ -80,26 +58,108 @@ function descomponerQuery(query) {
       componente += caracter;
     }
   }
-
   // Agregamos el último componente si no está vacío
   if (componente.trim() !== "") {
     componentes.push(componente.trim());
   }
-
   return componentes;
 }
 
-fs.readFile("querys.txt", "utf8", (err, data) => {
-  if (err) {
-    console.error(err);
-    return;
-  }
-  var query_split = data.split("\n");
-  query_split = query_split.map((element) => {
-    return element.trim();
-  });
+function esNumero(num) {
+  return /^[+-]?\d+(\.\d+)?$/.test(num);
+}
 
-  query_split.forEach(function (query) {
-    console.log(descomponerQuery(query));
+function tokenizar(lista_tokens, query) {
+  const tokenizado = [];
+  for (let i = 0; i < query.length; i++) {
+    const componente = query[i];
+    //console.log(componente)
+    let llaveEncontrada = null;
+    for (const llave in lista_tokens) {
+      //console.log(lista_tokens[llave])
+
+      if (lista_tokens[llave] === componente.toUpperCase()) {
+        llaveEncontrada = llave;
+        break; // Si encontraste la llave, puedes salir del bucle
+      }
+    }
+
+    if (llaveEncontrada) {
+      tokenizado.push(llaveEncontrada);
+    } else if (esNumero(componente)) {
+      tokenizado.push("777");
+    } else {
+      tokenizado.push("999");
+    }
+  }
+  return tokenizado;
+}
+
+// Promesa para leer el archivo de tokens
+const leer_tokens = new Promise((resolve, reject) => {
+  fs.readFile("sqlkeywords.txt", "utf8", (err, data) => {
+    if (err) {
+      reject(err);
+    } else {
+      resolve(data);
+    }
   });
 });
+
+// Promesa para leer el archivo de querys
+const leer_querys = new Promise((resolve, reject) => {
+  fs.readFile("querys.txt", "utf8", (err, data) => {
+    if (err) {
+      reject(err);
+    } else {
+      resolve(data);
+    }
+  });
+});
+
+//Se resuelven las promesas de forma paralela
+Promise.all([leer_tokens, leer_querys])
+  .then(([tokensData, querysData]) => {
+    //Se procesa el archivo de tokens para crear el diccionario
+    let tokens_split = tokensData.split("\n");
+    tokens_split = tokens_split.map((element) => {
+      return element.trim();
+    });
+    tokens_split.forEach((token) => {
+      const token_parts = token.split(":").map((element) => {
+        return element.trim();
+      });
+      const llave = token_parts[0];
+      const valor = token_parts[1];
+      if (llave !== "") {
+        tokens[llave] = valor;
+      }
+    });
+
+    //Se procesa los querys para ser descompuestos en sus componentes
+    let query_split = querysData.split("\n");
+    query_split = query_split.map((element) => {
+      return element.trim();
+    });
+
+    query_split.forEach(function (query) {
+      querys_descompuestos.push(descomponerQuery(query));
+    });
+    //console.log(tokens);
+    // console.log(querys_descompuestos);
+   // console.log(tokenizar(tokens, querys_descompuestos[0]));
+    const tokenizados = []
+    querys_descompuestos.forEach(function (query, indice) {
+      tokenizados.push(tokenizar(tokens,query));
+      console.log(
+        `Query ${indice+1}: ${query} \n Version Tokenizada: ${tokenizar(
+          tokens,
+          query
+        )}`
+      );
+    });
+  })
+
+  .catch((err) => {
+    console.error(err);
+  });
